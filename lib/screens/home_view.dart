@@ -1,0 +1,241 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:shop_app/providers/sales_provider.dart';
+import 'package:shop_app/utils/app_theme.dart';
+import 'package:shop_app/widgets/dashboard_card.dart';
+import 'package:intl/intl.dart';
+
+class HomeView extends StatelessWidget {
+  const HomeView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<SalesProvider>(
+      builder: (context, salesProvider, child) {
+        if (salesProvider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async => salesProvider.loadData(),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20.0),
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Dashboard Cards Row
+                SizedBox(
+                  height: 200,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    children: [
+                      SizedBox(
+                        width: 250,
+                        child: DashboardCard(
+                          title: "Total Sales",
+                          value:
+                              "₹ ${salesProvider.totalSales.toStringAsFixed(0)}",
+                          icon: Icons.currency_rupee,
+                          color: const Color(0xFF5B67F1),
+                          subtitle: "All time earnings",
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      SizedBox(
+                        width: 250,
+                        child: DashboardCard(
+                          title: "Today's Sales",
+                          value:
+                              "₹ ${salesProvider.todaySales.toStringAsFixed(0)}",
+                          icon: Icons.trending_up,
+                          color: const Color(0xFF5ABF77),
+                          subtitle: "Earned today",
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      SizedBox(
+                        width: 250,
+                        child: DashboardCard(
+                          title: "Transactions",
+                          value: "${salesProvider.todayTransactions}",
+                          icon: Icons.shopping_cart_outlined,
+                          color: const Color(0xFF8C52FF),
+                          subtitle: "Orders today",
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      "Recent Transactions",
+                      style: AppTheme.subHeadingStyle,
+                    ),
+                    Icon(
+                      Icons.access_time,
+                      size: 20,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                salesProvider.sales.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(40.0),
+                          child: Column(
+                            children: [
+                              Icon(
+                                Icons.storefront,
+                                size: 64,
+                                color: AppTheme.textSecondary.withValues(
+                                  alpha: 0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                "No sales yet\nAdd your first sale to get started",
+                                textAlign: TextAlign.center,
+                                style: AppTheme.captionStyle,
+                              ),
+                            ],
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: salesProvider.sales.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final sale = salesProvider.sales[index];
+                          return Container(
+                            decoration: AppTheme.cardDecoration.copyWith(
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: [],
+                              border: Border.all(
+                                color: Colors.grey.withValues(alpha: 0.1),
+                              ),
+                            ),
+                            child: ListTile(
+                              onLongPress: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: const Text("Delete Sale"),
+                                    content: const Text(
+                                      "Are you sure you want to delete this sale? This action cannot be undone.",
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text("Cancel"),
+                                      ),
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.pop(context);
+                                          // Extract ID properly. It might be an ObjectId object or a string representation
+                                          String id = sale['_id'].toString();
+                                          // Clean up if it's in format ObjectId("...")
+                                          if (id.startsWith('ObjectId("')) {
+                                            id = id.substring(10, 34);
+                                          }
+
+                                          Provider.of<SalesProvider>(
+                                            context,
+                                            listen: false,
+                                          ).deleteSale(id);
+
+                                          ScaffoldMessenger.of(
+                                            context,
+                                          ).showSnackBar(
+                                            SnackBar(
+                                              content: const Text(
+                                                "Sale deleted",
+                                              ),
+                                              behavior:
+                                                  SnackBarBehavior.floating,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              margin: const EdgeInsets.only(
+                                                bottom: 80,
+                                                left: 24,
+                                                right: 24,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                        child: const Text(
+                                          "Delete",
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 8,
+                              ),
+                              leading: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryColor.withValues(
+                                    alpha: 0.05,
+                                  ),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  sale['payment_mode'] == 'UPI'
+                                      ? Icons.qr_code
+                                      : sale['payment_mode'] == 'Card'
+                                      ? Icons.credit_card
+                                      : Icons.money,
+                                  color: AppTheme.primaryColor,
+                                  size: 20,
+                                ),
+                              ),
+                              title: Text(
+                                sale['description']?.toString().isNotEmpty ==
+                                        true
+                                    ? sale['description']
+                                    : "Sale",
+                                style: AppTheme.bodyStyle.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: Text(
+                                "${sale['platform'] ?? 'Offline'} • ${DateFormat('MMM d, h:mm a').format(DateTime.parse(sale['created_at'].toString()))}",
+                                style: AppTheme.captionStyle.copyWith(
+                                  fontSize: 12,
+                                ),
+                              ),
+                              trailing: Text(
+                                "₹ ${sale['amount']}",
+                                style: AppTheme.subHeadingStyle.copyWith(
+                                  fontSize: 18,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
